@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+message: "Se este repositório for reutilizado, cite o autor e as referências originais do UNSW-NB15."
+title: "Detecção de Intrusão no UNSW-NB15 com Redes Neurais Profundas"
+type: software
+authors:
+  - family-names: "Soares de Sousa"
+    given-names: "Romulo"
+version: 0.1.0
+date-released: 2026-07-11
