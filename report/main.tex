@@ -1,0 +1,230 @@
+\documentclass[12pt]{article}
+
+% Arquivos oficiais do template SBC: sbc-template.sty e sbc.bst.
+% Coloque-os nesta pasta (report/) antes de compilar.
+\usepackage{sbc-template}
+\usepackage{graphicx,url}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[brazil]{babel}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{float}
+\usepackage{microtype}
+
+\sloppy
+
+\title{Detecção de Intrusão no UNSW-NB15 com Redes Neurais Profundas para Priorização de Eventos em Ambientes SIEM/SOC}
+
+\author{Romulo Soares de Sousa}
+
+\address{Universidade Federal do ABC (UFABC)\\
+  CCM-109 -- Tópicos Especiais em Inteligência Artificial\\
+  Prof. Dr. Ronaldo Prati
+}
+
+% Troque pelo endereço público/privado liberado para a entrega.
+\newcommand{\repositoryurl}{\url{INSERIR-URL-DO-GITHUB}}
+
+% Diretórios de figuras. A primeira pasta contém os gráficos consolidados.
+\graphicspath{{../outputs/report_figures/}{../outputs/E03/figures/}{../outputs/E00_E02/figures/}}
+
+% Macro para que o arquivo compile mesmo antes de todas as figuras existirem.
+\newcommand{\optionalfigure}[4][0.88\linewidth]{%
+\begin{figure}[H]
+    \centering
+    \IfFileExists{#2}{\includegraphics[width=#1]{#2}}{%
+        \fbox{\parbox[c][3.2cm][c]{0.85\linewidth}{\centering Figura ainda não gerada:\\ \texttt{#2}}}%
+    }
+    \caption{#3}
+    \label{#4}
+\end{figure}
+}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+A crescente quantidade de eventos gerados por infraestruturas computacionais torna a priorização de possíveis incidentes uma atividade relevante em centros de operações de segurança. Este trabalho investiga a aplicação de aprendizado profundo à classificação binária de tráfego de rede utilizando o conjunto de dados UNSW-NB15. O problema é formulado como a estimativa da probabilidade de uma conexão representar tráfego normal ou atividade maliciosa. São comparados um classificador ingênuo, regressão logística, Random Forest e uma rede neural profunda totalmente conectada. O pré-processamento inclui imputação, codificação one-hot das variáveis categóricas e padronização das variáveis numéricas, com ajuste realizado exclusivamente sobre os dados de treinamento. A rede neural emprega ativações ReLU, dropout, otimização Adam e early stopping. Além das métricas convencionais, são analisados recall, F1-score, ROC-AUC, PR-AUC e taxa de falsos positivos, considerando o impacto operacional de falsos alertas em um cenário de segurança. Os resultados quantitativos serão preenchidos a partir dos artefatos produzidos pelos experimentos reproduzíveis disponibilizados no repositório do projeto.
+\end{abstract}
+
+\begin{resumo}
+A crescente quantidade de eventos gerados por infraestruturas computacionais torna a priorização de possíveis incidentes uma atividade relevante em centros de operações de segurança. Este trabalho investiga a aplicação de aprendizado profundo à classificação binária de tráfego de rede utilizando o conjunto de dados UNSW-NB15. São comparados modelos clássicos e uma rede neural profunda, com atenção especial ao compromisso entre detecção de ataques e falsos positivos. O pipeline experimental preserva o conjunto oficial de teste, ajusta o pré-processamento exclusivamente no treino e seleciona o limiar de decisão somente na validação. Os resultados quantitativos serão inseridos após a execução final dos experimentos.
+\end{resumo}
+
+\section{Descrição do Problema}
+\label{sec:problema}
+
+Soluções de \textit{Security Information and Event Management} (SIEM) são utilizadas para centralizar e correlacionar eventos produzidos por diferentes componentes de uma infraestrutura computacional. Em ambientes de grande porte, entretanto, o volume de registros e alertas pode dificultar a priorização das ocorrências que demandam investigação humana. Nesse contexto, técnicas de aprendizado de máquina podem atuar como um mecanismo auxiliar de classificação e priorização.
+
+O objetivo deste trabalho é investigar se características observadas em fluxos de rede permitem estimar a probabilidade de comportamento malicioso. A tarefa é formulada como uma classificação binária supervisionada. Para um vetor de características $x$ associado a uma conexão de rede, busca-se estimar
+
+\begin{equation}
+    P(y=1\mid x),
+\end{equation}
+
+em que $y=0$ representa tráfego normal e $y=1$ representa ataque.
+
+A pergunta de pesquisa é:
+
+\begin{quote}
+Uma rede neural profunda aplicada às características tabulares do UNSW-NB15 consegue melhorar a detecção de ataques em relação a baselines clássicos, sem produzir uma taxa excessiva de falsos positivos?
+\end{quote}
+
+A análise considera que, em um cenário inspirado em operações de segurança, a acurácia isolada é insuficiente. Um modelo com maior taxa de detecção pode ser operacionalmente inadequado caso gere quantidade excessiva de falsos positivos.
+
+\subsection{Conjunto de Dados}
+
+O estudo utiliza o UNSW-NB15, conjunto de dados público proposto para pesquisas em detecção de intrusão \cite{moustafa2015unsw,moustafa2016evaluation}. São empregadas as partições oficiais \texttt{UNSW\_NB15\_training-set.csv} e \texttt{UNSW\_NB15\_testing-set.csv}. A coluna \texttt{label} é utilizada como alvo binário. A coluna \texttt{attack\_cat} é preservada apenas para análise exploratória e removida das entradas do classificador, assim como \texttt{id}, evitando vazamento de informação e o uso de um identificador sem significado preditivo.
+
+\optionalfigure{class_distribution.png}{Distribuição proporcional das classes nas partições oficiais de treino e teste.}{fig:class-distribution}
+
+\optionalfigure{attack_categories.png}{Distribuição das categorias de ataque no conjunto oficial de treinamento.}{fig:attack-categories}
+
+A análise exploratória também compara estatísticas das variáveis numéricas entre treino e teste e inspeciona correlações entre os atributos mais associados ao rótulo. Essas verificações são utilizadas apenas como apoio à análise e não substituem um teste formal de \textit{data drift}.
+
+\optionalfigure{distribution_shift.png}{Sinal exploratório de diferença de distribuição entre treino e teste.}{fig:distribution-shift}
+
+\section{Abordagem}
+\label{sec:abordagem}
+
+\subsection{Protocolo Experimental}
+
+O arquivo oficial de treinamento é dividido de forma estratificada em treino e validação, utilizando 20\% para validação e semente aleatória 42. O arquivo oficial de teste permanece isolado durante o desenvolvimento e é utilizado apenas para a avaliação final.
+
+Todas as transformações dependentes dos dados são ajustadas exclusivamente sobre o subconjunto de treinamento. Para as variáveis categóricas é aplicada imputação pela categoria mais frequente seguida de codificação \textit{one-hot}, com tratamento de categorias desconhecidas no conjunto de validação ou teste. Para as variáveis numéricas é aplicada imputação pela mediana seguida de padronização por \textit{StandardScaler}. As variáveis categóricas previstas no projeto são \texttt{proto}, \texttt{service} e \texttt{state}, além de qualquer outra coluna textual eventualmente identificada pelo pipeline.
+
+\subsection{Baselines}
+
+Três referências são utilizadas antes da avaliação da rede neural. O \textit{Dummy Classifier} com estratégia baseada na distribuição a priori fornece um limite mínimo de desempenho. A regressão logística atua como baseline linear e utiliza \texttt{class\_weight=balanced}. O Random Forest representa um baseline não linear com 200 árvores, profundidade máxima 20, tamanho mínimo de folha igual a dois e balanceamento por \texttt{balanced\_subsample}.
+
+\subsection{Rede Neural Profunda}
+
+O modelo principal é uma rede neural \textit{feedforward} totalmente conectada implementada em PyTorch. A configuração principal utiliza duas camadas ocultas, com 128 e 64 neurônios, ativações ReLU e dropout de 0,30 e 0,20, respectivamente. A camada final possui uma unidade e produz um \textit{logit}. Na inferência, a função sigmoide converte o logit em probabilidade estimada de ataque.
+
+\optionalfigure{dnn_architecture.png}{Arquitetura da DNN principal utilizada no experimento E03.}{fig:dnn-architecture}
+
+O treinamento utiliza \texttt{BCEWithLogitsLoss}, otimizador Adam com taxa de aprendizado $10^{-3}$, \textit{batch size} 512 e no máximo 100 épocas. O \textit{early stopping} interrompe o treinamento após dez épocas sem melhora da perda de validação. O experimento principal também permite o uso de \texttt{pos\_weight}, calculado a partir da proporção entre exemplos negativos e positivos no conjunto de treinamento.
+
+\optionalfigure{dnn_training_history.png}{Histórico da perda de treinamento e validação da DNN principal.}{fig:dnn-history}
+
+\subsection{Seleção do Limiar e Métricas}
+
+Além do limiar convencional de 0,5, cada modelo probabilístico utiliza um limiar selecionado exclusivamente no conjunto de validação, escolhendo-se o valor que maximiza o F1-score. Esse limiar é então aplicado uma única vez ao conjunto oficial de teste.
+
+As métricas registradas são acurácia, precisão, recall, F1-score, ROC-AUC, PR-AUC, taxa de falsos positivos (FPR), taxa de falsos negativos (FNR) e as quatro contagens da matriz de confusão. Em um cenário de segurança, atenção especial é dada ao compromisso entre recall e FPR.
+
+\section{Resultados}
+\label{sec:resultados}
+
+\subsection{Comparação entre Modelos}
+
+A Tabela~\ref{tab:modelos} deve ser preenchida diretamente a partir dos arquivos JSON gerados em \texttt{outputs/}. O gráfico correspondente é produzido automaticamente pelo script de figuras do relatório.
+
+\begin{table}[H]
+\centering
+\caption{Resultados no conjunto oficial de teste com limiar selecionado na validação.}
+\label{tab:modelos}
+\small
+\begin{tabular}{lrrrrrrr}
+\toprule
+Modelo & Acc. & Prec. & Recall & F1 & ROC-AUC & PR-AUC & FPR \\
+\midrule
+Dummy              & -- & -- & -- & -- & -- & -- & -- \\
+Regressão Logística& -- & -- & -- & -- & -- & -- & -- \\
+Random Forest       & -- & -- & -- & -- & -- & -- & -- \\
+DNN                 & -- & -- & -- & -- & -- & -- & -- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\optionalfigure{model_comparison.png}{Comparação de F1, recall e FPR entre os modelos avaliados.}{fig:model-comparison}
+
+\subsection{Matriz de Confusão e Curvas de Avaliação}
+
+As Figuras~\ref{fig:cm}, \ref{fig:roc} e \ref{fig:pr} correspondem à DNN principal avaliada com o limiar selecionado na validação. Os arquivos são produzidos diretamente pelo módulo \texttt{src.metrics} durante o treinamento.
+
+\optionalfigure{dnn_pytorch_test_confusion_matrix.png}{Matriz de confusão da DNN principal no conjunto de teste.}{fig:cm}
+\optionalfigure{dnn_pytorch_test_roc_curve.png}{Curva ROC da DNN principal no conjunto de teste.}{fig:roc}
+\optionalfigure{dnn_pytorch_test_precision_recall_curve.png}{Curva Precision-Recall da DNN principal no conjunto de teste.}{fig:pr}
+
+\subsection{Efeito do Ajuste de Limiar}
+
+A comparação entre o limiar 0,5 e o limiar selecionado na validação permite verificar se o aumento da sensibilidade a ataques produz um custo aceitável em falsos positivos.
+
+\begin{table}[H]
+\centering
+\caption{Comparação do limiar padrão e do limiar ajustado da DNN.}
+\label{tab:threshold}
+\begin{tabular}{lrrrrr}
+\toprule
+Configuração & Limiar & Precisão & Recall & F1 & FPR \\
+\midrule
+Padrão   & 0,500 & -- & -- & -- & -- \\
+Ajustado & --    & -- & -- & -- & -- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\optionalfigure{threshold_comparison.png}{Efeito do ajuste de limiar sobre precisão, recall, F1 e FPR da DNN.}{fig:threshold-comparison}
+
+\subsection{Experimentos de Ablação}
+
+Após o experimento principal, são previstas variações controladas da arquitetura, como remoção de dropout, redução de largura da rede e desativação de \texttt{pos\_weight}. O objetivo não é realizar uma busca extensa de hiperparâmetros, mas produzir comparações interpretáveis e reproduzíveis.
+
+\begin{table}[H]
+\centering
+\caption{Resumo das ablações da DNN.}
+\label{tab:ablations}
+\begin{tabular}{llllrrr}
+\toprule
+ID & Arquitetura & Dropout & \texttt{pos\_weight} & F1 & Recall & FPR \\
+\midrule
+E03 & 128--64 & 0,30/0,20 & Sim & -- & -- & -- \\
+E04 & 128--64 & 0/0       & Sim & -- & -- & -- \\
+E05 & 64--32  & 0,30/0,20 & Sim & -- & -- & -- \\
+E06 & 128--64 & 0,30/0,20 & Não & -- & -- & -- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\optionalfigure{ablation_comparison.png}{Comparação das ablações da DNN quando pelo menos duas execuções estiverem disponíveis.}{fig:ablation-comparison}
+
+\section{Lições Aprendidas e Discussão}
+\label{sec:licoes}
+
+A análise final deve considerar mais do que a identificação do modelo com maior acurácia. Em uma aplicação inspirada em triagem de segurança, o custo operacional dos falsos positivos pode ser tão relevante quanto a capacidade de detectar ataques. Por esse motivo, a discussão deve confrontar F1, recall e FPR, além de observar a matriz de confusão.
+
+Os resultados devem responder, com base nos valores efetivamente medidos: (i) se a DNN supera a regressão logística; (ii) se apresenta vantagem consistente sobre o Random Forest; (iii) qual modelo possui menor FPR; (iv) qual possui maior recall; (v) se o ajuste de limiar fornece um compromisso operacionalmente plausível; (vi) se dropout melhora a generalização; e (vii) se uma rede menor obtém desempenho comparável com menor complexidade.
+
+Experimentos que não produzirem melhoria também devem ser documentados. O enunciado da disciplina destaca que tentativas que não funcionaram são informativas e devem ser registradas no relatório final.
+
+\subsection{Limitações}
+
+O UNSW-NB15 permite um experimento controlado de classificação, mas não reproduz integralmente o contexto de uma infraestrutura corporativa atual. Os registros representam fluxos de rede rotulados e não alertas completos produzidos diretamente por uma plataforma SIEM. Assim, a associação com um SOC deve ser interpretada como uma simulação de priorização: a probabilidade do modelo poderia funcionar como sinal adicional de risco, mas o projeto não implementa correlação temporal, contexto de ativos, enriquecimento de ameaças ou integração direta com um SIEM.
+
+Outra limitação é a formulação binária da tarefa. A identificação específica das famílias de ataques permanece como possível extensão futura.
+
+\subsection{Reprodutibilidade}
+
+O código, os parâmetros dos experimentos, o notebook de análise exploratória e os scripts de geração de métricas e figuras são disponibilizados no repositório:
+
+\begin{center}
+\repositoryurl
+\end{center}
+
+Os dados brutos não são versionados e devem ser obtidos na fonte oficial do UNSW-NB15. As execuções utilizam semente 42 e o pré-processamento é ajustado exclusivamente no subconjunto de treinamento.
+
+\section{Conclusão}
+\label{sec:conclusao}
+
+Este trabalho investiga a utilização de uma rede neural profunda para classificação binária de tráfego de rede no UNSW-NB15, comparando-a com baselines clássicos e adotando um protocolo que preserva o conjunto oficial de teste. A conclusão quantitativa deve ser preenchida somente após a execução final dos experimentos, destacando não apenas o desempenho preditivo, mas também o compromisso entre detecção de ataques e falsos positivos.
+
+Como trabalhos futuros, podem ser exploradas classificação multiclasse das famílias de ataque, técnicas de explicabilidade, arquiteturas alternativas e validação em dados mais próximos de operações corporativas reais.
+
+\bibliographystyle{sbc}
+\bibliography{references}
+
+\end{document}

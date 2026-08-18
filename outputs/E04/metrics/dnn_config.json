@@ -1,0 +1,17 @@
+{
+  "hidden_dims": [
+    128,
+    64
+  ],
+  "dropout": [
+    0.0,
+    0.0
+  ],
+  "learning_rate": 0.001,
+  "batch_size": 512,
+  "epochs": 100,
+  "patience": 10,
+  "validation_size": 0.2,
+  "use_pos_weight": true,
+  "random_state": 42
+}

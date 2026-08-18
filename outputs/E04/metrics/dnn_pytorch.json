@@ -1,0 +1,91 @@
+{
+  "model": "dnn_pytorch",
+  "device": "cpu",
+  "config": {
+    "hidden_dims": [
+      128,
+      64
+    ],
+    "dropout": [
+      0.0,
+      0.0
+    ],
+    "learning_rate": 0.001,
+    "batch_size": 512,
+    "epochs": 100,
+    "patience": 10,
+    "validation_size": 0.2,
+    "use_pos_weight": true,
+    "random_state": 42
+  },
+  "pos_weight": 0.4692475199699402,
+  "input_features": 192,
+  "parameters": 33025,
+  "epochs_ran": 86,
+  "best_validation_loss": 0.07444562445440611,
+  "training_seconds": 121.6969438999995,
+  "validation_default": {
+    "threshold": 0.5,
+    "accuracy": 0.9421711483076222,
+    "precision": 0.9744124418958252,
+    "recall": 0.93971259793037,
+    "f1": 0.9567479952226583,
+    "roc_auc": 0.9913202944045773,
+    "pr_auc": 0.995872339029912,
+    "false_positive_rate": 0.05258928571428571,
+    "false_negative_rate": 0.06028740206963006,
+    "tn": 10611,
+    "fp": 589,
+    "fn": 1439,
+    "tp": 22430,
+    "support": 35069
+  },
+  "validation_tuned": {
+    "threshold": 0.2818637788295746,
+    "accuracy": 0.9502409535487183,
+    "precision": 0.9489812484779608,
+    "recall": 0.979555071431564,
+    "f1": 0.9640258107077329,
+    "roc_auc": 0.9913202944045773,
+    "pr_auc": 0.995872339029912,
+    "false_positive_rate": 0.11223214285714286,
+    "false_negative_rate": 0.020444928568436046,
+    "tn": 9943,
+    "fp": 1257,
+    "fn": 488,
+    "tp": 23381,
+    "support": 35069
+  },
+  "test_default": {
+    "threshold": 0.5,
+    "accuracy": 0.8936743914881212,
+    "precision": 0.8679879275653923,
+    "recall": 0.9516235771640342,
+    "f1": 0.9078836602407611,
+    "roc_auc": 0.9766255517849094,
+    "pr_auc": 0.9825947507495463,
+    "false_positive_rate": 0.17732432432432432,
+    "false_negative_rate": 0.048376422835965764,
+    "tn": 30439,
+    "fp": 6561,
+    "fn": 2193,
+    "tp": 43139,
+    "support": 82332
+  },
+  "test_tuned": {
+    "threshold": 0.2818637788295746,
+    "accuracy": 0.8521959869795462,
+    "precision": 0.7975274084441334,
+    "recall": 0.9804773669813818,
+    "f1": 0.8795899587386086,
+    "roc_auc": 0.9766255517849094,
+    "pr_auc": 0.9825947507495463,
+    "false_positive_rate": 0.304972972972973,
+    "false_negative_rate": 0.019522633018618195,
+    "tn": 25716,
+    "fp": 11284,
+    "fn": 885,
+    "tp": 44447,
+    "support": 82332
+  }
+}
